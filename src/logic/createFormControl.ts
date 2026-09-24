@@ -341,7 +341,9 @@ export function createFormControl<
       }
 
       const touchedFieldsArray = get(_formState.touchedFields, name);
-      if (shouldUpdateFieldsAndState && Array.isArray(touchedFieldsArray)) {
+      const shouldUpdateTouchedFields =
+        shouldUpdateFieldsAndState && Array.isArray(touchedFieldsArray);
+      if (shouldUpdateTouchedFields) {
         const touchedFields = method(touchedFieldsArray, args.argA, args.argB);
         shouldSetValues && set(_formState.touchedFields, name, touchedFields);
       }
@@ -362,6 +364,9 @@ export function createFormControl<
         name,
         isDirty: _getDirty(name, values),
         dirtyFields: _formState.dirtyFields,
+        ...(shouldUpdateTouchedFields && {
+          touchedFields: _formState.touchedFields,
+        }),
         errors: _formState.errors,
         isValid: _formState.isValid,
       });
@@ -708,9 +713,9 @@ export function createFormControl<
     name: FieldPath<TFieldValues> | FieldPath<TFieldValues>[] | undefined;
     eventType: ValidateFormEventType;
   }) => {
-    if (props.validate) {
+    if (_options.validate) {
       const resetCallId = _resetCallId;
-      const result = await props.validate({
+      const result = await _options.validate({
         formValues: _formValues,
         formState: _formState,
         name,
@@ -776,7 +781,7 @@ export function createFormControl<
     };
   }) => {
     const resetCallId = _resetCallId;
-    if (props.validate && !context.runRootValidation) {
+    if (_options.validate && !context.runRootValidation) {
       context.runRootValidation = true;
       const result = await validateForm({
         name,
@@ -1223,7 +1228,7 @@ export function createFormControl<
         event.type === EVENTS.BLUR || event.type === EVENTS.FOCUS_OUT;
       const hasNoValidationEffect =
         !hasValidation(field._f) &&
-        !props.validate &&
+        !_options.validate &&
         !_options.resolver &&
         !get(_formState.errors, name) &&
         !field._f.deps;
@@ -1283,7 +1288,7 @@ export function createFormControl<
         );
       }
 
-      if (!_options.resolver && props.validate) {
+      if (!_options.resolver && _options.validate) {
         await validateForm({
           name: name as FieldPath<TFieldValues>,
           eventType: event.type,
