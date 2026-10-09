@@ -605,6 +605,23 @@ describe('setValue', () => {
     });
   });
 
+  it('should update an object value that contains a `ref` key', () => {
+    const { result } = renderHook(() =>
+      useForm({
+        defaultValues: { order: { ref: 'A-100', quantity: 1 } },
+      }),
+    );
+
+    act(() => {
+      result.current.setValue('order', { ref: 'B-200', quantity: 1 });
+    });
+
+    expect(result.current.getValues('order')).toEqual({
+      ref: 'B-200',
+      quantity: 1,
+    });
+  });
+
   describe('with watch', () => {
     it('should get watched value', () => {
       const { result } = renderHook(() => {
@@ -1044,6 +1061,45 @@ describe('setValue', () => {
       fireEvent.click(screen.getByRole('button'));
 
       expect(screen.getByText('test')).toBeVisible();
+    });
+
+    it('should mark fields named after Object.prototype members as touched', () => {
+      let touchedFieldsState = {};
+
+      const App = () => {
+        const {
+          setValue,
+          register,
+          formState: { touchedFields },
+        } = useForm({
+          defaultValues: { hasOwnProperty: '', toString: '' },
+        });
+
+        touchedFieldsState = touchedFields;
+
+        return (
+          <>
+            <input {...register('hasOwnProperty')} />
+            <input {...register('toString')} />
+            <button
+              onClick={() => {
+                setValue('hasOwnProperty', 'data', { shouldTouch: true });
+                setValue('toString', 'data', { shouldTouch: true });
+              }}
+            >
+              Test
+            </button>
+          </>
+        );
+      };
+      render(<App />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(touchedFieldsState).toEqual({
+        hasOwnProperty: true,
+        toString: true,
+      });
     });
   });
 
