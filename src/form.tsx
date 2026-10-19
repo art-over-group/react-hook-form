@@ -6,7 +6,7 @@ import isString from './utils/isString';
 import { safeJSONStringify } from './utils/json';
 import noop from './utils/noop';
 import type { FieldValues, FormProps } from './types';
-import { useFormContext } from './useFormContext';
+import { useFormControlContext } from './useFormControlContext';
 
 const POST_REQUEST = 'post';
 
@@ -32,10 +32,14 @@ export function Form<
   TFieldValues extends FieldValues,
   TTransformedValues = TFieldValues,
 >(props: FormProps<TFieldValues, TTransformedValues>): React.ReactNode {
-  const methods = useFormContext<TFieldValues, unknown, TTransformedValues>();
+  const formControl = useFormControlContext<
+    TFieldValues,
+    unknown,
+    TTransformedValues
+  >();
   const [mounted, setMounted] = React.useState(false);
   const {
-    control = methods.control,
+    control = formControl,
     onSubmit = noop,
     children,
     action,
@@ -66,11 +70,13 @@ export function Form<
 
       if (isString(action)) {
         try {
-          const shouldStringifySubmissionData =
+          const hasContentType = (type: RegExp) =>
             (headers &&
-              headers['Content-Type'] &&
-              headers['Content-Type'].includes('json')) ||
-            (encType && encType.includes('json'));
+              Object.entries(headers).some(
+                ([name, value]) =>
+                  name.toLowerCase() === 'content-type' && type.test(value),
+              )) ||
+            (encType && type.test(encType));
 
           const response = await fetch(action, {
             method,
@@ -81,7 +87,18 @@ export function Form<
                   'Content-Type': encType,
                 }),
             },
-            body: shouldStringifySubmissionData ? formDataJson : formData,
+            body: hasContentType(/json/i)
+              ? formDataJson
+              : hasContentType(
+                    /^\s*application\/x-www-form-urlencoded\s*(;|$)/i,
+                  )
+                ? new URLSearchParams(
+                    Array.from(formData, ([name, value]) => [
+                      name,
+                      isString(value) ? value : value.name,
+                    ]),
+                  )
+                : formData,
           });
 
           if (response && !validateStatus(response.status)) {

@@ -12,7 +12,7 @@ describe('Form', () => {
     jest.restoreAllMocks();
   });
 
-  it('should support render with both form tag and headless', () => {
+  it('support render with both form tag and headless', () => {
     const WithContext = () => (
       <>
         <Form />
@@ -44,7 +44,7 @@ describe('Form', () => {
     render(<App />);
   });
 
-  it('should handle success request callback', async () => {
+  it('handle success request callback', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'ok' }), {
         status: 200,
@@ -100,7 +100,7 @@ describe('Form', () => {
     });
   });
 
-  it('should handle error request callback', async () => {
+  it('handle error request callback', async () => {
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 500 }));
@@ -142,7 +142,7 @@ describe('Form', () => {
     });
   });
 
-  it('should validate custom status code', async () => {
+  it('validate custom status code', async () => {
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 201 }));
@@ -175,7 +175,7 @@ describe('Form', () => {
     });
   });
 
-  it('should support other request type', async () => {
+  it('support other request type', async () => {
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
@@ -203,7 +203,7 @@ describe('Form', () => {
     });
   });
 
-  it('should support render props for react native', async () => {
+  it('support render props for react native', async () => {
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
@@ -240,7 +240,7 @@ describe('Form', () => {
     });
   });
 
-  it('should support fetcher prop with external request', async () => {
+  it('support fetcher prop with external request', async () => {
     const fetcher = jest.fn().mockResolvedValue({});
     jest
       .spyOn(global, 'fetch')
@@ -276,7 +276,7 @@ describe('Form', () => {
     });
   });
 
-  it('should include application/json header with encType supplied', async () => {
+  it('include application/json header with encType supplied', async () => {
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
@@ -311,7 +311,109 @@ describe('Form', () => {
     });
   });
 
-  it('should call a function action with FormData instead of fetching', async () => {
+  it.each([
+    ['Content-Type', 'application/json', true],
+    ['Content-Type', 'application/JSON', true],
+    ['content-type', 'application/json', true],
+    ['CoNtEnT-TyPe', 'application/json', true],
+    ['content-type', 'text/plain', false],
+    ['content-type', 'application/x-www-form-urlencodedfoo', false],
+    ['X-Response-Format', 'application/json', false],
+  ] as const)(
+    'choose the submission body for header %s: %s',
+    async (headerName, headerValue, isJSON) => {
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(new Response(null, { status: 200 }));
+      const headers = { [headerName]: headerValue };
+
+      const App = () => {
+        const { register, control } = useForm({
+          defaultValues: { name: 'bill' },
+        });
+
+        return (
+          <Form action="/json" control={control} headers={headers}>
+            <input {...register('name')} />
+            <button>Submit</button>
+          </Form>
+        );
+      };
+
+      render(<App />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledWith(
+          '/json',
+          expect.objectContaining({
+            headers,
+            body: isJSON
+              ? JSON.stringify({ name: 'bill' })
+              : expect.any(FormData),
+          }),
+        );
+      });
+    },
+  );
+
+  it.each([
+    [
+      'encType',
+      'application/x-www-form-urlencoded',
+      { encType: 'application/x-www-form-urlencoded' },
+    ],
+    [
+      'headers',
+      'application/x-www-form-urlencoded',
+      { headers: { 'content-type': 'application/x-www-form-urlencoded' } },
+    ],
+    [
+      'headers',
+      'application/x-www-form-urlencoded; charset=UTF-8',
+      {
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+      },
+    ],
+  ] as const)(
+    'send a url-encoded body when %s sets %s',
+    async (_, contentType, props) => {
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(new Response(null, { status: 200 }));
+      const resume = new Blob(['content'], { type: 'text/plain' });
+
+      const App = () => {
+        const { register, control } = useForm({
+          defaultValues: { name: 'bill', city: 'New York', resume },
+        });
+
+        return (
+          <Form action="/api" control={control} {...props}>
+            <input {...register('name')} />
+            <input {...register('city')} />
+            <button>Submit</button>
+          </Form>
+        );
+      };
+
+      render(<App />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+
+      const init = fetchSpy.mock.calls[0][1];
+
+      expect(new Headers(init?.headers).get('content-type')).toBe(contentType);
+      expect(String(init?.body)).toBe('name=bill&city=New+York&resume=blob');
+    },
+  );
+
+  it('call a function action with FormData instead of fetching', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const actionFn = jest.fn<(formData: FormData) => Promise<void>>(
       async () => {},
@@ -343,7 +445,7 @@ describe('Form', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('should include file values in the submitted FormData', async () => {
+  it('include file values in the submitted FormData', async () => {
     const actionFn = jest.fn<(formData: FormData) => Promise<void>>(
       async () => {},
     );
@@ -375,7 +477,7 @@ describe('Form', () => {
     expect(formData.get('resume')).toBeInstanceOf(Blob);
   });
 
-  it('should invoke onError when a function action throws', async () => {
+  it('invoke onError when a function action throws', async () => {
     const onError = jest.fn();
     const actionFn = jest.fn(async () => {
       throw new Error('boom');
@@ -403,7 +505,7 @@ describe('Form', () => {
     );
   });
 
-  it('should not render method/encType on the form element when action is a function', () => {
+  it('not render method/encType on the form element when action is a function', () => {
     const App = () => {
       const { control } = useForm();
 
@@ -421,7 +523,7 @@ describe('Form', () => {
     expect(form.hasAttribute('enctype')).toBe(false);
   });
 
-  it('should still render method/encType on the form element when action is a URL string', () => {
+  it('still render method/encType on the form element when action is a URL string', () => {
     const App = () => {
       const { control } = useForm();
 
@@ -439,7 +541,7 @@ describe('Form', () => {
     expect(form.getAttribute('enctype')).toBe('text/plain');
   });
 
-  it('should support explicit "multipart/form-data" encType', async () => {
+  it('support explicit "multipart/form-data" encType', async () => {
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
@@ -472,5 +574,38 @@ describe('Form', () => {
     await waitFor(() => {
       expect(onSuccess).toHaveBeenCalled();
     });
+  });
+  it('not re-render Form when unrelated formState updates in FormProvider', () => {
+    let formRenderCount = 0;
+
+    const FormConsumer = React.memo(() => {
+      formRenderCount++;
+      return (
+        <Form>
+          <input data-testid="inside-form" />
+        </Form>
+      );
+    });
+
+    const App = () => {
+      const methods = useForm<{ test: string }>();
+      methods.formState.isDirty;
+
+      return (
+        <FormProvider {...methods}>
+          <FormConsumer />
+          <input data-testid="outside-input" {...methods.register('test')} />
+        </FormProvider>
+      );
+    };
+
+    render(<App />);
+    const initialRenderCount = formRenderCount;
+
+    fireEvent.change(screen.getByTestId('outside-input'), {
+      target: { value: 'updated' },
+    });
+
+    expect(formRenderCount).toBe(initialRenderCount);
   });
 });

@@ -1,11 +1,17 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react';
 
 import { useForm } from '../../useForm';
 import { useFormState } from '../../useFormState';
 
 describe('resetField', () => {
-  it('should reset input value', () => {
+  it('reset input value', () => {
     const App = () => {
       const { register, resetField } = useForm({
         defaultValues: {
@@ -47,7 +53,7 @@ describe('resetField', () => {
     );
   });
 
-  it('should reset input touched field state', async () => {
+  it('reset input touched field state', async () => {
     const App = () => {
       const {
         register,
@@ -88,7 +94,7 @@ describe('resetField', () => {
     expect(await screen.findByText('noTouched')).toBeVisible();
   });
 
-  it('should reset input dirty field and dirty state', async () => {
+  it('reset input dirty field and dirty state', async () => {
     const App = () => {
       const {
         register,
@@ -134,7 +140,7 @@ describe('resetField', () => {
     expect(screen.getByText('formNotDirty')).toBeVisible();
   });
 
-  it('should reset input error field and isValid state', async () => {
+  it('reset input error field and isValid state', async () => {
     const App = () => {
       const {
         register,
@@ -184,7 +190,7 @@ describe('resetField', () => {
     expect(screen.getByText('noError')).toBeVisible();
   });
 
-  it('should reset input file to empty string only', () => {
+  it('reset input file to empty string only', () => {
     const getValuesFn = jest.fn();
 
     const App = () => {
@@ -228,8 +234,12 @@ describe('resetField', () => {
     expect(getValuesFn).toHaveBeenCalledWith({ test: '' });
   });
 
-  it('should notify a memoized field-scoped subscriber after an unrelated field validated via onChange', async () => {
-    const BWatcher = React.memo(({ control }: { control: any }) => {
+  it('notify a memoized field-scoped subscriber after an unrelated field validated via onChange', async () => {
+    const BWatcher = React.memo(function TouchedField({
+      control,
+    }: {
+      control: any;
+    }) {
       const { touchedFields } = useFormState({
         control,
         name: 'b',
@@ -292,7 +302,7 @@ describe('resetField', () => {
   });
 
   describe('when provided with options', () => {
-    it('should update input value and its defaultValue', () => {
+    it('update input value and its defaultValue', () => {
       const App = () => {
         const { register, resetField } = useForm({
           defaultValues: {
@@ -336,7 +346,7 @@ describe('resetField', () => {
       );
     });
 
-    it('should keep touched field state', async () => {
+    it('keep touched field state', async () => {
       const App = () => {
         const {
           register,
@@ -377,7 +387,7 @@ describe('resetField', () => {
       expect(await screen.findByText('touched')).toBeVisible();
     });
 
-    it('should keep dirty field and isDirty state', async () => {
+    it('keep dirty field and isDirty state', async () => {
       const App = () => {
         const {
           register,
@@ -423,7 +433,7 @@ describe('resetField', () => {
       expect(screen.getByText('formDirty')).toBeVisible();
     });
 
-    it('should skip reset error field and isValid state', async () => {
+    it('skip reset error field and isValid state', async () => {
       const App = () => {
         const {
           register,
@@ -473,7 +483,7 @@ describe('resetField', () => {
       expect(screen.getByText('error')).toBeVisible();
     });
 
-    it('should work with objects as defaultValue', async () => {
+    it('work with objects as defaultValue', async () => {
       const App = () => {
         const {
           register,
@@ -530,7 +540,7 @@ describe('resetField', () => {
     });
   });
 
-  it('should update isValid state for a subscribe only consumer', async () => {
+  it('update isValid state for a subscribe only consumer', async () => {
     const App = () => {
       const { register, resetField, subscribe } = useForm({
         defaultValues: {
@@ -580,7 +590,7 @@ describe('resetField', () => {
     expect(await screen.findByText('valid')).toBeVisible();
   });
 
-  it('should clear stale validating state when reset does not revalidate', async () => {
+  it('clear stale validating state when reset does not revalidate', async () => {
     let resolveValidate: (value: boolean) => void;
 
     const App = () => {
@@ -642,7 +652,7 @@ describe('resetField', () => {
     expect(screen.getByText('validatingFields:')).toBeInTheDocument();
   });
 
-  it('should cancel pending delayError timers for nested fields when their parent is reset', async () => {
+  it('cancel pending delayError timers for nested fields when their parent is reset', async () => {
     jest.useFakeTimers();
 
     const message = 'too long.';
@@ -688,7 +698,7 @@ describe('resetField', () => {
     jest.useRealTimers();
   });
 
-  it('should not cancel a pending delayError timer for a field that only shares a name prefix with the reset field', async () => {
+  it('not cancel a pending delayError timer for a field that only shares a name prefix with the reset field', async () => {
     jest.useFakeTimers();
 
     const message = 'too long.';
@@ -733,4 +743,34 @@ describe('resetField', () => {
 
     jest.useRealTimers();
   });
+  it.each([
+    ['number', 0, 10],
+    ['boolean', false, true],
+    ['string', '', 'hello'],
+  ])(
+    'correctly update isDirty when resetting a field with falsy defaultValue (%s)',
+    (_, falsyDefault, initialDefault) => {
+      const { result } = renderHook(() =>
+        useForm<{ test: unknown }>({
+          defaultValues: { test: initialDefault },
+        }),
+      );
+
+      result.current.register('test');
+      result.current.formState.isDirty;
+
+      act(() => {
+        result.current.setValue('test', 'dirty-value', { shouldDirty: true });
+      });
+
+      expect(result.current.formState.isDirty).toBe(true);
+
+      act(() => {
+        result.current.resetField('test', { defaultValue: falsyDefault });
+      });
+
+      expect(result.current.getValues('test')).toBe(falsyDefault);
+      expect(result.current.formState.isDirty).toBe(false);
+    },
+  );
 });

@@ -1,10 +1,11 @@
 import React from 'react';
 
-import { DEFAULT_FORM_STATE } from './logic/createFormControl';
+import { DEFAULT_FORM_STATE, defaultOptions } from './logic/createFormControl';
 import getProxyFormState from './logic/getProxyFormState';
 import cloneObject from './utils/cloneObject';
 import deepEqual from './utils/deepEqual';
 import isFunction from './utils/isFunction';
+import { FORM_ERROR_TYPE } from './constants';
 import { createFormControl } from './logic';
 import type {
   FieldValues,
@@ -14,6 +15,20 @@ import type {
 } from './types';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
 import { useResyncOnReconnect } from './useResyncOnReconnect';
+
+const RESET_OPTIONS = {
+  mode: defaultOptions.mode,
+  reValidateMode: defaultOptions.reValidateMode,
+  shouldFocusError: defaultOptions.shouldFocusError,
+  resolver: undefined,
+  criteriaMode: undefined,
+  delayError: undefined,
+  shouldUnregister: undefined,
+  shouldUseNativeValidation: undefined,
+  context: undefined,
+  progressive: undefined,
+  resetOptions: undefined,
+} as const;
 
 /**
  * Core hook for managing a form. Returns all methods and state for
@@ -41,6 +56,9 @@ export function useForm<
   >(undefined);
   const _values = React.useRef<typeof props.values>(undefined);
   const _formControlProp = React.useRef(props.formControl);
+  const _hadDisabled = React.useRef(false);
+  const _hadValidate = React.useRef(!!props.validate);
+  const _hadErrors = React.useRef(!!props.errors);
   const [formState, updateFormState] = React.useState<FormState<TFieldValues>>(
     () => ({
       ...cloneObject(DEFAULT_FORM_STATE),
@@ -58,6 +76,7 @@ export function useForm<
     (props.formControl && _formControlProp.current !== props.formControl)
   ) {
     _formControlProp.current = props.formControl;
+    _hadDisabled.current = false;
     if (props.formControl) {
       _formControl.current = {
         ...props.formControl,
@@ -78,7 +97,25 @@ export function useForm<
   }
 
   const control = _formControl.current.control;
-  control._options = props;
+
+  const previousOptions = control._options;
+  const removedOptions: Record<string, unknown> = {};
+
+  for (const key in RESET_OPTIONS) {
+    if (key in previousOptions && !(key in props)) {
+      removedOptions[key] = RESET_OPTIONS[key as keyof typeof RESET_OPTIONS];
+    }
+  }
+
+  if (_hadDisabled.current && !props.disabled) {
+    removedOptions.disabled = false;
+  }
+
+  control._options = {
+    ...removedOptions,
+    ...props,
+    validate: props.validate,
+  };
 
   const getCurrentFormState = () => ({
     ...control._formState,
@@ -109,6 +146,7 @@ export function useForm<
     }));
 
     control._formState.isReady = true;
+    control._subjects.state.next({ isReady: true });
 
     return () => {
       unsubscribe();
@@ -116,10 +154,12 @@ export function useForm<
     };
   }, [control, resyncIfNeeded, snapshot]);
 
-  React.useEffect(
-    () => control._disableForm(props.disabled),
-    [control, props.disabled],
-  );
+  React.useEffect(() => {
+    control._disableForm(
+      _hadDisabled.current && !props.disabled ? false : props.disabled,
+    );
+    _hadDisabled.current = !!props.disabled;
+  }, [control, props.disabled]);
 
   React.useEffect(() => {
     if (props.mode) {
@@ -134,8 +174,18 @@ export function useForm<
     if (props.errors) {
       control._setErrors(props.errors);
       control._focusError();
+    } else if (_hadErrors.current) {
+      control._setErrors({});
     }
+    _hadErrors.current = !!props.errors;
   }, [control, props.errors]);
+
+  React.useEffect(() => {
+    if (_hadValidate.current && !props.validate) {
+      _formControl.current && _formControl.current.clearErrors(FORM_ERROR_TYPE);
+    }
+    _hadValidate.current = !!props.validate;
+  }, [props.validate]);
 
   React.useEffect(() => {
     props.shouldUnregister &&
@@ -161,7 +211,12 @@ export function useForm<
         keepFieldsRef: true,
         ...control._options.resetOptions,
       });
-      if (!control._options.resetOptions?.keepIsValid) {
+      if (
+        !(
+          control._options.resetOptions &&
+          control._options.resetOptions.keepIsValid
+        )
+      ) {
         control._setValid();
       }
       _values.current = props.values;
