@@ -4,11 +4,15 @@ import isPlainObject from './isPlainObject';
 import isPrimitive from './isPrimitive';
 
 const isEmptyObjectWithCustomPrototype = (object: object, keys: string[]) =>
-  keys.length === 0 && !Array.isArray(object) && !isPlainObject(object);
+  keys.length === 0 &&
+  !Array.isArray(object) &&
+  Object.getPrototypeOf(object) !== null &&
+  !isPlainObject(object);
 
 export default function deepEqual(
   object1: unknown,
   object2: unknown,
+  isErrorObject = false,
   visited = new WeakMap<object, WeakSet<object>>(),
 ) {
   if (object1 === object2) {
@@ -21,6 +25,14 @@ export default function deepEqual(
 
   if (isDateObject(object1) && isDateObject(object2)) {
     return Object.is(object1.getTime(), object2.getTime());
+  }
+
+  if (
+    Array.isArray(object1) &&
+    Array.isArray(object2) &&
+    object1.length !== object2.length
+  ) {
+    return false;
   }
 
   const keys1 = Object.keys(object1);
@@ -58,18 +70,18 @@ export default function deepEqual(
   for (const key of keys1) {
     const val1 = (object1 as Record<string, unknown>)[key];
 
-    if (!(key in (object2 as object))) {
+    if (!Object.prototype.hasOwnProperty.call(object2, key)) {
       return false;
     }
 
-    if (key !== 'ref') {
+    if (!isErrorObject || key !== 'ref') {
       const val2 = (object2 as Record<string, unknown>)[key];
 
       if (
         (isDateObject(val1) && isDateObject(val2)) ||
         ((isObject(val1) || Array.isArray(val1)) &&
           (isObject(val2) || Array.isArray(val2)))
-          ? !deepEqual(val1, val2, visited)
+          ? !deepEqual(val1, val2, isErrorObject, visited)
           : !Object.is(val1, val2)
       ) {
         return false;

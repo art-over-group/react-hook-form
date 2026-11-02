@@ -63,7 +63,11 @@ export default async <T extends FieldValues>(
     if (shouldUseNativeValidation && inputRef.reportValidity) {
       const validityMessage = isBoolean(message) ? '' : message || '';
       if (refs) {
-        refs.forEach((ref) => ref.setCustomValidity(validityMessage));
+        refs.forEach(
+          (ref) =>
+            isFunction(ref.setCustomValidity) &&
+            ref.setCustomValidity(validityMessage),
+        );
       } else {
         inputRef.setCustomValidity(validityMessage);
       }
@@ -71,8 +75,8 @@ export default async <T extends FieldValues>(
     }
   };
   const error: InternalFieldErrors = {};
-  const isRadio = isRadioInput(ref);
-  const isCheckBox = isCheckBoxInput(ref);
+  const isRadio = !_c && isRadioInput(ref);
+  const isCheckBox = !_c && isCheckBoxInput(ref);
   const isRadioOrCheckbox = isRadio || isCheckBox;
   const isEmpty =
     ((valueAsNumber || isFileInput(ref)) &&
@@ -142,7 +146,7 @@ export default async <T extends FieldValues>(
       !isNaN(inputValue as number)
     ) {
       const valueNumber =
-        (ref as HTMLInputElement).valueAsNumber ||
+        (!_c && (ref as HTMLInputElement).valueAsNumber) ||
         (inputValue ? +inputValue : inputValue);
       if (!isNullOrUndefined(maxOutput.value)) {
         exceedMax = valueNumber > maxOutput.value;
@@ -152,7 +156,8 @@ export default async <T extends FieldValues>(
       }
     } else {
       const valueDate =
-        (ref as HTMLInputElement).valueAsDate || new Date(inputValue as string);
+        (!_c && (ref as HTMLInputElement).valueAsDate) ||
+        new Date(inputValue as string);
       const convertTimeToDate = (time: unknown) =>
         new Date(new Date().toDateString() + ' ' + time);
       const isTime = ref.type == 'time';
@@ -191,7 +196,7 @@ export default async <T extends FieldValues>(
   }
 
   if (
-    (maxLength || minLength) &&
+    (!isNullOrUndefined(maxLength) || !isNullOrUndefined(minLength)) &&
     !isEmpty &&
     (isString(inputValue) || (isFieldArray && Array.isArray(inputValue)))
   ) {

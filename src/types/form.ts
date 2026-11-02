@@ -12,7 +12,6 @@ import type {
 import type { EventType } from './events';
 import type { FieldArray } from './fieldArray';
 import type {
-  FieldName,
   FieldRefs,
   FieldValue,
   FieldValues,
@@ -311,7 +310,7 @@ export type UseFormGetValues<TFieldValues extends FieldValues> = {
    * <button onClick={() => getValues()}>getValues</button>
    *
    * <input {...register("name", {
-   *   validate: (value, formValues) => formValues.otherField === value;
+   *   validate: (value, formValues) => formValues.otherField === value
    * })} />
    * ```
    */
@@ -332,7 +331,7 @@ export type UseFormGetValues<TFieldValues extends FieldValues> = {
    * <button onClick={() => getValues("name")}>getValues</button>
    *
    * <input {...register("name", {
-   *   validate: () => getValues('otherField') === "test";
+   *   validate: () => getValues('otherField') === "test"
    * })} />
    * ```
    */
@@ -356,7 +355,7 @@ export type UseFormGetValues<TFieldValues extends FieldValues> = {
    * <button onClick={() => getValues(["name", "name1"])}>getValues</button>
    *
    * <input {...register("name", {
-   *   validate: () => getValues(["fieldA", "fieldB"]).includes("test");
+   *   validate: () => getValues(["fieldA", "fieldB"]).includes("test")
    * })} />
    * ```
    */
@@ -786,7 +785,7 @@ export type UseFormHandleSubmit<
  * @example
  * ```tsx
  * <input {...register("firstName", { required: true })} />
- * <button type="button" onClick={() => resetField("firstName"))}>Reset</button>
+ * <button type="button" onClick={() => resetField("firstName")}>Reset</button>
  * ```
  */
 export type UseFormResetField<TFieldValues extends FieldValues> = <
@@ -812,7 +811,7 @@ type ResetAction<TFieldValues> = (formValues: TFieldValues) => TFieldValues;
  * useEffect(() => {
  *   // reset the entire form after component mount or form defaultValues are ready
  *   reset({
- *     fieldA: "test"
+ *     fieldA: "test",
  *     fieldB: "test"
  *   });
  * }, [reset])
@@ -970,7 +969,7 @@ export type Control<
   _setErrors: (errors: FieldErrors<TFieldValues>) => void;
   _setDisabledField: (props: {
     disabled?: boolean;
-    name: FieldName<any>;
+    name: InternalFieldName;
   }) => void;
   _runSchema: (names: InternalFieldName[]) => Promise<{ errors: FieldErrors }>;
   _updateIsValidating: (

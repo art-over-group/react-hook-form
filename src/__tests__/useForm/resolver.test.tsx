@@ -19,7 +19,7 @@ import noop from '../../utils/noop';
 import sleep from '../../utils/sleep';
 
 describe('resolver', () => {
-  it('should not update useFormState subscribers while Controller is rendering after reset', async () => {
+  it('not update useFormState subscribers while Controller is rendering after reset', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(noop);
 
     const FieldLabel = ({ name }: { name: string }) => {
@@ -78,7 +78,7 @@ describe('resolver', () => {
     consoleError.mockRestore();
   });
 
-  it('should update context within the resolver', async () => {
+  it('update context within the resolver', async () => {
     type FormValues = {
       test: string;
     };
@@ -124,7 +124,7 @@ describe('resolver', () => {
     ).toBeVisible();
   });
 
-  it('should support resolver schema switching', async () => {
+  it('support resolver schema switching', async () => {
     type FormValues = {
       test: string;
     };
@@ -189,7 +189,7 @@ describe('resolver', () => {
     expect(await screen.findByText('Submitted')).toBeVisible();
   });
 
-  it('should be called with the shouldUseNativeValidation option to true', async () => {
+  it('be called with the shouldUseNativeValidation option to true', async () => {
     const test = jest.fn();
     const resolver = (a: any, b: any, c: any) => {
       test(a, b, c);
@@ -223,7 +223,7 @@ describe('resolver', () => {
     );
   });
 
-  it('should avoid the problem of race condition', async () => {
+  it('avoid the problem of race condition', async () => {
     jest.useFakeTimers();
 
     type FormValues = {
@@ -299,7 +299,67 @@ describe('resolver', () => {
     expect(errorsObject).toEqual({});
   });
 
-  it('should submit a transformed value on success', async () => {
+  it('avoid a stale NaN result winning the race against a later number', async () => {
+    jest.useFakeTimers();
+
+    type FormValues = {
+      test: number;
+    };
+
+    let errorsObject: FieldErrors<FormValues> = {};
+
+    const resolver: Resolver<FormValues> = async (values) => {
+      if (Number.isNaN(values.test)) {
+        await sleep(100);
+        return {
+          errors: {
+            test: {
+              type: 'test',
+              message: 'wrong',
+            },
+          },
+          values: {},
+        };
+      }
+
+      return {
+        errors: {},
+        values,
+      };
+    };
+
+    const App = () => {
+      const {
+        register,
+        formState: { errors },
+      } = useForm<FormValues>({
+        resolver,
+        mode: 'onChange',
+      });
+      errorsObject = errors;
+
+      return (
+        <form>
+          <input {...register('test', { valueAsNumber: true })} />
+        </form>
+      );
+    };
+
+    render(<App />);
+
+    const input = screen.getByRole('textbox');
+
+    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.change(input, { target: { value: '5' } });
+
+    await act(async () => {
+      jest.advanceTimersByTime(200);
+    });
+
+    expect(errorsObject).toEqual({});
+  });
+
+  it('submit a transformed value on success', async () => {
     type FormValues = {
       alpha: string;
       beta: string;
@@ -336,7 +396,7 @@ describe('resolver', () => {
     ).toBeVisible();
   });
 
-  it('should submit field errors on failure', async () => {
+  it('submit field errors on failure', async () => {
     type FormValues = {
       alpha: string;
       beta: string;
@@ -413,7 +473,7 @@ describe('resolver', () => {
       return null;
     };
 
-    it('should batch state updates in onChange mode', async () => {
+    it('batch state updates in onChange mode', async () => {
       const stateEmissions: Array<{ errors: any; isValidating: boolean }> = [];
 
       const App = () => {
@@ -449,7 +509,7 @@ describe('resolver', () => {
       expect(stateEmissions[1].isValidating).toBe(false);
     });
 
-    it('should update isDirty after rapid changes with async resolver', async () => {
+    it('update isDirty after rapid changes with async resolver', async () => {
       type DirtyState = { isDirty: boolean };
       const dirtyStateEmissions: DirtyState[] = [];
 
@@ -484,7 +544,7 @@ describe('resolver', () => {
       });
     });
 
-    it('should propagate isDirty to a separate useFormState subscriber when Controller field.onChange is called twice in the same tick', async () => {
+    it('propagate isDirty to a separate useFormState subscriber when Controller field.onChange is called twice in the same tick', async () => {
       type FieldValues = { field: string };
 
       function DirtyStatus({ control }: { control: Control<FieldValues> }) {
@@ -531,7 +591,7 @@ describe('resolver', () => {
       );
     });
 
-    it('should batch state updates in onBlur mode', async () => {
+    it('batch state updates in onBlur mode', async () => {
       const stateEmissions: Array<{ errors: any; isValidating: boolean }> = [];
 
       const App = () => {
@@ -569,7 +629,7 @@ describe('resolver', () => {
       expect(stateEmissions[1].isValidating).toBe(false);
     });
 
-    it('should batch state updates when using trigger', async () => {
+    it('batch state updates when using trigger', async () => {
       const stateEmissions: Array<{ errors: any; isValidating: boolean }> = [];
 
       const App = () => {
@@ -607,7 +667,7 @@ describe('resolver', () => {
       expect(stateEmissions[1].isValidating).toBe(false);
     });
 
-    it('should not cause "Cannot update component while rendering" error with fieldArray and async validation', async () => {
+    it('not cause "Cannot update component while rendering" error with fieldArray and async validation', async () => {
       const consoleError = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
